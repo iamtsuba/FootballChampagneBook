@@ -24,12 +24,13 @@ const COULEURS_YEUX    = ['Bleu', 'Vert', 'Marron', 'Noir', 'Gris', 'Noisette']
 const TYPES_COIFFURE   = ['Chauve', 'Rasé', 'Court', 'Mi-long', 'Long']
 const TYPES_NEZ        = ['Petit', 'Normal', 'Grand', 'Aquilin', 'Retroussé', 'Épaté']
 const MORPHOLOGIES     = ['Costaud', 'Musclé', 'Athlétique', 'Fin', 'Mince', 'Enrobé', 'Grand et fin', 'Petit et trapu']
+const PEAUX            = ['Noir', 'Blanc', 'Métisse', 'Méditerranéen', 'Asiatique']
 
 const empty = {
   nom: '', prenom: '', surnom: '', age: '', nationalite: '', poste: '',
   taille_u15: '', taille_u18: '', taille_senior: '',
   couleur_cheveux: '', couleur_yeux: '', type_coiffure: '', style_coiffure: '',
-  type_nez: '', lunettes: false, morphologie: '',
+  type_nez: '', lunettes: false, morphologie: '', peau: '',
   caracteristiques_design: '', style_personnalite: '', notes: '', avatar_url: ''
 }
 const emptyAjout = { equipe_id: '', categorie: '', annee_debut: '', annee_fin: '', numero_maillot: '' }
@@ -289,6 +290,7 @@ export default function Personnages() {
           <SectionTitle>Apparence physique</SectionTitle>
           <div className="form-grid" style={{ marginBottom: '20px' }}>
             <SelectField label="Morphologie" field="morphologie" options={MORPHOLOGIES} />
+            <SelectField label="Couleur de peau" field="peau" options={PEAUX} />
             <SelectField label="Couleur cheveux" field="couleur_cheveux" options={COULEURS_CHEVEUX} />
             <SelectField label="Type de coiffure" field="type_coiffure" options={TYPES_COIFFURE} />
             <div className="form-group">
@@ -391,6 +393,7 @@ export default function Personnages() {
                 <div className="detail-section-title" style={{ marginBottom: '8px' }}>👤 Apparence</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   {current.morphologie    && <span className="badge badge-accent">{current.morphologie}</span>}
+                  {current.peau           && <span className="badge badge-accent">Peau {current.peau}</span>}
                   {current.couleur_cheveux && <span className="badge">Cheveux {current.couleur_cheveux}</span>}
                   {current.type_coiffure  && <span className="badge">{current.type_coiffure}</span>}
                   {current.style_coiffure && <span className="badge">{current.style_coiffure}</span>}
