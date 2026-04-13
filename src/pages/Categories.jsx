@@ -309,7 +309,7 @@ export default function Categories() {
       {showModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex',
           alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}
-          onClick={e => { if (e.target === e.currentTarget) setShowModal(false) }}>
+          >
           <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '14px',
             padding: '28px', width: '360px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div>
