@@ -8,6 +8,7 @@ const emptyEquipe = {
   couleur_principale: '#e8ff3a', couleur_secondaire: '#0a0a0f',
   description_maillot: '', logo_url: '', palmarès: [], notes: ''
 }
+const emptySaison = { annee_debut: '', annee_fin: '' }
 
 export default function Equipes() {
   const [data, setData] = useState([])
@@ -19,6 +20,14 @@ export default function Equipes() {
   const [selectedEquipe, setSelectedEquipe] = useState(null)
   const [saisons, setSaisons] = useState([])
   const [palmaresEntry, setPalmaresEntry] = useState({ annee: '', titre: '' })
+
+  // Formulaire nouvelle saison
+  const [showSaisonForm, setShowSaisonForm] = useState(false)
+  const [newSaison, setNewSaison] = useState(emptySaison)
+
+  // Formulaire ajout joueur par saison : { [saisonId]: { open, personnageId, numero } }
+  const [joueurForms, setJoueurForms] = useState({})
+
   const toast = useToast()
 
   async function load() {
@@ -68,37 +77,25 @@ export default function Equipes() {
   async function openDetail(equipe) {
     setSelectedEquipe(equipe)
     await loadSaisons(equipe.id)
+    setShowSaisonForm(false)
+    setJoueurForms({})
     setModal('detail')
   }
 
-  async function addSaison(equipeId) {
-    const debut = prompt('Année de début de saison :')
-    if (!debut) return
-    const fin = prompt('Année de fin de saison :')
-    if (!fin) return
-    await supabase.from('saisons').insert({ equipe_id: equipeId, annee_debut: parseInt(debut), annee_fin: parseInt(fin) })
-    toast('Saison ajoutée ✓')
-    loadSaisons(equipeId)
-  }
-
-  async function addJoueurToSaison(saisonId) {
-    const options = personnages.map(p => `${p.id} — ${p.prenom} ${p.nom}`)
-    const choice = prompt(`Entrez l'ID du joueur (ou choisissez):\n${options.slice(0, 20).join('\n')}`)
-    if (!choice) return
-    const pid = choice.split(' — ')[0].trim()
-    const num = prompt('Numéro de maillot (optionnel) :')
-    await supabase.from('saison_joueurs').insert({
-      saison_id: saisonId,
-      personnage_id: pid,
-      numero_maillot: num ? parseInt(num) : null
+  // ── SAISON ──
+  async function submitSaison() {
+    if (!newSaison.annee_debut || !newSaison.annee_fin) {
+      toast('Remplis les deux années', 'error'); return
+    }
+    const { error } = await supabase.from('saisons').insert({
+      equipe_id: selectedEquipe.id,
+      annee_debut: parseInt(newSaison.annee_debut),
+      annee_fin: parseInt(newSaison.annee_fin)
     })
-    toast('Joueur ajouté ✓')
-    loadSaisons(selectedEquipe.id)
-  }
-
-  async function removeJoueur(id) {
-    await supabase.from('saison_joueurs').delete().eq('id', id)
-    toast('Joueur retiré')
+    if (error) { toast('Erreur', 'error'); return }
+    toast('Saison ajoutée ✓')
+    setNewSaison(emptySaison)
+    setShowSaisonForm(false)
     loadSaisons(selectedEquipe.id)
   }
 
@@ -109,14 +106,62 @@ export default function Equipes() {
     loadSaisons(selectedEquipe.id)
   }
 
+  // ── JOUEUR ──
+  function toggleJoueurForm(saisonId) {
+    setJoueurForms(prev => ({
+      ...prev,
+      [saisonId]: prev[saisonId]?.open
+        ? { open: false, personnageId: '', numero: '' }
+        : { open: true, personnageId: '', numero: '' }
+    }))
+  }
+
+  function getJoueurForm(saisonId) {
+    return joueurForms[saisonId] || { open: false, personnageId: '', numero: '' }
+  }
+
+  function setJoueurField(saisonId, field, value) {
+    setJoueurForms(prev => ({
+      ...prev,
+      [saisonId]: { ...getJoueurForm(saisonId), [field]: value }
+    }))
+  }
+
+  async function submitJoueur(saisonId, saison) {
+    const form = getJoueurForm(saisonId)
+    if (!form.personnageId) { toast('Sélectionne un joueur', 'error'); return }
+    const dejaDans = saison.saison_joueurs?.find(sj => sj.personnage_id === form.personnageId)
+    if (dejaDans) { toast('Ce joueur est déjà dans cette saison', 'error'); return }
+    const { error } = await supabase.from('saison_joueurs').insert({
+      saison_id: saisonId,
+      personnage_id: form.personnageId,
+      numero_maillot: form.numero ? parseInt(form.numero) : null
+    })
+    if (error) { toast('Erreur', 'error'); return }
+    toast('Joueur ajouté ✓')
+    setJoueurForms(prev => ({ ...prev, [saisonId]: { open: false, personnageId: '', numero: '' } }))
+    loadSaisons(selectedEquipe.id)
+  }
+
+  async function removeJoueur(id) {
+    await supabase.from('saison_joueurs').delete().eq('id', id)
+    toast('Joueur retiré')
+    loadSaisons(selectedEquipe.id)
+  }
+
+  // ── PALMARES ──
   function addPalmaresEntry() {
     if (!palmaresEntry.annee || !palmaresEntry.titre) return
     setCurrent(c => ({ ...c, 'palmarès': [...(c['palmarès'] || []), { ...palmaresEntry }] }))
     setPalmaresEntry({ annee: '', titre: '' })
   }
-
   function removePalmaresEntry(idx) {
     setCurrent(c => ({ ...c, 'palmarès': c['palmarès'].filter((_, i) => i !== idx) }))
+  }
+
+  function joueursDispo(saison) {
+    const deja = new Set(saison.saison_joueurs?.map(sj => sj.personnage_id) || [])
+    return personnages.filter(p => !deja.has(p.id))
   }
 
   return (
@@ -133,10 +178,7 @@ export default function Equipes() {
 
       {loading ? <p style={{ color: 'var(--text-muted)', padding: '40px', textAlign: 'center' }}>Chargement...</p>
         : data.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">⬡</div>
-            <h3>Aucune équipe</h3>
-          </div>
+          <div className="empty-state"><div className="empty-icon">⬡</div><h3>Aucune équipe</h3></div>
         ) : (
           <div className="cards-grid">
             {data.map(e => (
@@ -147,8 +189,8 @@ export default function Equipes() {
                     {e.acronyme && <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{e.acronyme}</div>}
                   </div>
                   <div className="color-swatches">
-                    <div className="color-swatch" style={{ background: e.couleur_principale }} title={e.couleur_principale} />
-                    <div className="color-swatch" style={{ background: e.couleur_secondaire }} title={e.couleur_secondaire} />
+                    <div className="color-swatch" style={{ background: e.couleur_principale }} />
+                    <div className="color-swatch" style={{ background: e.couleur_secondaire }} />
                   </div>
                 </div>
                 <div className="card-meta" style={{ marginTop: '8px' }}>
@@ -171,18 +213,13 @@ export default function Equipes() {
           </div>
         )}
 
-      {/* CREATE / EDIT MODAL */}
+      {/* ── MODALE CRÉER / MODIFIER ── */}
       {(modal === 'create' || modal === 'edit') && (
-        <Modal
-          title={modal === 'create' ? 'NOUVELLE ÉQUIPE' : 'MODIFIER ÉQUIPE'}
-          onClose={() => setModal(null)}
+        <Modal title={modal === 'create' ? 'NOUVELLE ÉQUIPE' : 'MODIFIER ÉQUIPE'} onClose={() => setModal(null)}
           footer={<>
             <button className="btn btn-secondary" onClick={() => setModal(null)}>Annuler</button>
-            <button className="btn btn-primary" onClick={save} disabled={saving}>
-              {saving ? 'Sauvegarde...' : 'Sauvegarder'}
-            </button>
-          </>}
-        >
+            <button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? 'Sauvegarde...' : 'Sauvegarder'}</button>
+          </>}>
           <div className="form-grid">
             <div className="form-group">
               <label className="form-label">Nom *</label>
@@ -204,30 +241,28 @@ export default function Equipes() {
               <label className="form-label">Couleur principale</label>
               <div className="color-input-group">
                 <div className="color-preview" style={{ background: current.couleur_principale }} />
-                <input className="form-input" type="color" value={current.couleur_principale}
+                <input type="color" value={current.couleur_principale}
                   onChange={e => setCurrent(c => ({ ...c, couleur_principale: e.target.value }))}
-                  style={{ padding: '4px', height: '40px', cursor: 'pointer' }} />
+                  style={{ width: '40px', height: '40px', padding: '2px', background: 'none', border: '1px solid var(--border)', borderRadius: '4px', cursor: 'pointer' }} />
                 <input className="form-input" value={current.couleur_principale}
-                  onChange={e => setCurrent(c => ({ ...c, couleur_principale: e.target.value }))}
-                  style={{ flex: 1 }} />
+                  onChange={e => setCurrent(c => ({ ...c, couleur_principale: e.target.value }))} style={{ flex: 1 }} />
               </div>
             </div>
             <div className="form-group">
               <label className="form-label">Couleur secondaire</label>
               <div className="color-input-group">
                 <div className="color-preview" style={{ background: current.couleur_secondaire }} />
-                <input className="form-input" type="color" value={current.couleur_secondaire}
+                <input type="color" value={current.couleur_secondaire}
                   onChange={e => setCurrent(c => ({ ...c, couleur_secondaire: e.target.value }))}
-                  style={{ padding: '4px', height: '40px', cursor: 'pointer' }} />
+                  style={{ width: '40px', height: '40px', padding: '2px', background: 'none', border: '1px solid var(--border)', borderRadius: '4px', cursor: 'pointer' }} />
                 <input className="form-input" value={current.couleur_secondaire}
-                  onChange={e => setCurrent(c => ({ ...c, couleur_secondaire: e.target.value }))}
-                  style={{ flex: 1 }} />
+                  onChange={e => setCurrent(c => ({ ...c, couleur_secondaire: e.target.value }))} style={{ flex: 1 }} />
               </div>
             </div>
             <div className="form-group full">
               <label className="form-label">Description du maillot</label>
               <textarea className="form-textarea" rows={3}
-                placeholder="Décris le maillot en détail : coupe, motifs, numérotation, sponsor, matière..."
+                placeholder="Décris le maillot en détail : coupe, motifs, numérotation, sponsor..."
                 value={current.description_maillot}
                 onChange={e => setCurrent(c => ({ ...c, description_maillot: e.target.value }))} />
             </div>
@@ -247,7 +282,8 @@ export default function Equipes() {
                       background: 'var(--bg)', borderRadius: '4px', padding: '6px 10px', fontSize: '0.83rem' }}>
                       <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-display)' }}>{p.annee}</span>
                       <span style={{ flex: 1 }}>{p.titre}</span>
-                      <button onClick={() => removePalmaresEntry(i)} style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
+                      <button onClick={() => removePalmaresEntry(i)}
+                        style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
                     </div>
                   ))}
                 </div>
@@ -262,15 +298,16 @@ export default function Equipes() {
         </Modal>
       )}
 
-      {/* DETAIL MODAL WITH SAISONS */}
+      {/* ── MODALE DÉTAIL + SAISONS ── */}
       {modal === 'detail' && selectedEquipe && (
         <Modal title={selectedEquipe.nom} onClose={() => setModal(null)}
           footer={<>
             <button className="btn btn-secondary" onClick={() => setModal(null)}>Fermer</button>
-            <button className="btn btn-primary" onClick={() => { setCurrent(selectedEquipe); setModal('edit') }}>Modifier</button>
+            <button className="btn btn-primary" onClick={() => { setCurrent(selectedEquipe); setModal('edit') }}>Modifier l'équipe</button>
           </>}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {/* Colors */}
+
+            {/* Couleurs */}
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
               <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: selectedEquipe.couleur_principale, border: '3px solid var(--border-bright)' }} />
               <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: selectedEquipe.couleur_secondaire, border: '3px solid var(--border-bright)' }} />
@@ -300,39 +337,145 @@ export default function Equipes() {
               </div>
             )}
 
-            {/* SAISONS */}
+            {/* ── SAISONS ── */}
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <div className="detail-section-title">Effectifs par saison</div>
-                <button className="btn btn-secondary btn-sm" onClick={() => addSaison(selectedEquipe.id)}>+ Saison</button>
+                <button className="btn btn-secondary btn-sm"
+                  onClick={() => { setShowSaisonForm(v => !v); setNewSaison(emptySaison) }}>
+                  {showSaisonForm ? 'Annuler' : '+ Nouvelle saison'}
+                </button>
               </div>
-              {saisons.length === 0 ? (
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.83rem' }}>Aucune saison — cliquez "+ Saison" pour commencer</p>
-              ) : saisons.map(s => (
-                <div key={s.id} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '6px', padding: '12px', marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', color: 'var(--accent)' }}>
-                      {s.annee_debut}–{s.annee_fin}
-                    </span>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button className="btn btn-secondary btn-sm" onClick={() => addJoueurToSaison(s.id)}>+ Joueur</button>
-                      <button className="btn btn-danger btn-sm" onClick={() => removeSaison(s.id)}>✕</button>
+
+              {/* Formulaire nouvelle saison */}
+              {showSaisonForm && (
+                <div style={{ background: 'var(--bg)', border: '1px solid var(--accent)',
+                  borderRadius: '8px', padding: '14px', marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                    <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
+                      <label className="form-label">Année début</label>
+                      <input className="form-input" type="number" placeholder="ex: 2024"
+                        value={newSaison.annee_debut}
+                        onChange={e => setNewSaison(s => ({ ...s, annee_debut: e.target.value }))} />
                     </div>
+                    <div className="form-group" style={{ flex: 1, minWidth: '120px' }}>
+                      <label className="form-label">Année fin</label>
+                      <input className="form-input" type="number" placeholder="ex: 2025"
+                        value={newSaison.annee_fin}
+                        onChange={e => setNewSaison(s => ({ ...s, annee_fin: e.target.value }))} />
+                    </div>
+                    <button className="btn btn-primary" style={{ marginBottom: '1px' }} onClick={submitSaison}>
+                      Créer la saison
+                    </button>
                   </div>
-                  {s.saison_joueurs?.length > 0 ? (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                      {s.saison_joueurs.map(sj => (
-                        <div key={sj.id} style={{ display: 'flex', alignItems: 'center', gap: '6px',
-                          background: 'var(--bg-card)', borderRadius: '4px', padding: '4px 8px', fontSize: '0.78rem' }}>
-                          {sj.numero_maillot && <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-display)' }}>#{sj.numero_maillot}</span>}
-                          <span>{sj.personnages?.prenom} {sj.personnages?.nom}</span>
-                          <button onClick={() => removeJoueur(sj.id)} style={{ color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.7rem' }}>✕</button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>Aucun joueur dans cette saison</p>}
                 </div>
-              ))}
+              )}
+
+              {saisons.length === 0 && !showSaisonForm && (
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.83rem' }}>
+                  Aucune saison — clique sur "+ Nouvelle saison" pour commencer.
+                </p>
+              )}
+
+              {/* Liste des saisons */}
+              {saisons.map(s => {
+                const form = getJoueurForm(s.id)
+                const dispo = joueursDispo(s)
+                return (
+                  <div key={s.id} style={{ background: 'var(--bg)', border: '1px solid var(--border)',
+                    borderRadius: '8px', padding: '14px', marginBottom: '10px' }}>
+
+                    {/* Header saison */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.2rem', color: 'var(--accent)' }}>
+                        Saison {s.annee_debut}–{s.annee_fin}
+                        <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '8px' }}>
+                          {s.saison_joueurs?.length || 0} joueur{(s.saison_joueurs?.length || 0) !== 1 ? 's' : ''}
+                        </span>
+                      </span>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button className="btn btn-secondary btn-sm" onClick={() => toggleJoueurForm(s.id)}>
+                          {form.open ? '✕ Annuler' : '+ Joueur'}
+                        </button>
+                        <button className="btn btn-danger btn-sm btn-icon" onClick={() => removeSaison(s.id)} title="Supprimer la saison">🗑</button>
+                      </div>
+                    </div>
+
+                    {/* Formulaire ajout joueur */}
+                    {form.open && (
+                      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-bright)',
+                        borderRadius: '6px', padding: '12px', marginBottom: '10px' }}>
+                        {dispo.length === 0 ? (
+                          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                            Tous les personnages sont déjà dans cette saison.{' '}
+                            <span style={{ color: 'var(--accent)' }}>
+                              Crée d'abord un personnage dans la section "Personnages".
+                            </span>
+                          </p>
+                        ) : (
+                          <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                            <div className="form-group" style={{ flex: 2, minWidth: '160px' }}>
+                              <label className="form-label">Joueur</label>
+                              <select className="form-select" value={form.personnageId}
+                                onChange={e => setJoueurField(s.id, 'personnageId', e.target.value)}>
+                                <option value="">— Sélectionner un joueur —</option>
+                                {dispo.map(p => (
+                                  <option key={p.id} value={p.id}>{p.prenom} {p.nom}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="form-group" style={{ width: '110px' }}>
+                              <label className="form-label">N° maillot</label>
+                              <input className="form-input" type="number" min="1" placeholder="ex: 10"
+                                value={form.numero}
+                                onChange={e => setJoueurField(s.id, 'numero', e.target.value)} />
+                            </div>
+                            <button className="btn btn-primary" style={{ marginBottom: '1px' }}
+                              onClick={() => submitJoueur(s.id, s)}>
+                              Ajouter
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Liste joueurs */}
+                    {s.saison_joueurs?.length > 0 ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                        {[...s.saison_joueurs]
+                          .sort((a, b) => (a.numero_maillot ?? 999) - (b.numero_maillot ?? 999))
+                          .map(sj => (
+                            <div key={sj.id} style={{ display: 'flex', alignItems: 'center', gap: '6px',
+                              background: 'var(--bg-card)', border: '1px solid var(--border)',
+                              borderRadius: '20px', padding: '5px 12px', fontSize: '0.82rem',
+                              transition: 'border-color 0.15s' }}
+                              onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--border-bright)'}
+                              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+                              {sj.numero_maillot != null && (
+                                <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-display)',
+                                  fontSize: '1rem', minWidth: '22px', textAlign: 'center' }}>
+                                  {sj.numero_maillot}
+                                </span>
+                              )}
+                              <span>{sj.personnages?.prenom} {sj.personnages?.nom}</span>
+                              <button onClick={() => removeJoueur(sj.id)} title="Retirer ce joueur"
+                                style={{ color: 'var(--text-dim)', background: 'none', border: 'none',
+                                  cursor: 'pointer', fontSize: '0.75rem', lineHeight: 1, padding: '0 2px' }}
+                                onMouseEnter={e => e.target.style.color = 'var(--danger)'}
+                                onMouseLeave={e => e.target.style.color = 'var(--text-dim)'}>
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                      </div>
+                    ) : (
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)', fontStyle: 'italic' }}>
+                        Aucun joueur — clique sur "+ Joueur" pour en ajouter.
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
         </Modal>
