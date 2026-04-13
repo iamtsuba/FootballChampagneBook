@@ -12,6 +12,8 @@ const nav = [
     links: [
       { to: '/personnages', label: 'Personnages', icon: '◉' },
       { to: '/equipes', label: 'Équipes', icon: '⬡' },
+      { to: '/saisons', label: 'Saisons', icon: '📅' },
+      { to: '/categories', label: 'Catégories', icon: '🏷' },
       { to: '/competitions', label: 'Compétitions', icon: '◆' },
       { to: '/matchs', label: 'Matchs', icon: '▶' },
     ]

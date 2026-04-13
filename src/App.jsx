@@ -3,6 +3,8 @@ import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
 import Personnages from './pages/Personnages'
 import Equipes from './pages/Equipes'
+import Saisons from './pages/Saisons'
+import Categories from './pages/Categories'
 import Competitions from './pages/Competitions'
 import Matchs from './pages/Matchs'
 import Arcs from './pages/Arcs'
@@ -21,6 +23,8 @@ export default function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/personnages" element={<Personnages />} />
               <Route path="/equipes" element={<Equipes />} />
+              <Route path="/saisons" element={<Saisons />} />
+              <Route path="/categories" element={<Categories />} />
               <Route path="/competitions" element={<Competitions />} />
               <Route path="/matchs" element={<Matchs />} />
               <Route path="/arcs" element={<Arcs />} />
