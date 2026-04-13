@@ -24,6 +24,7 @@ export default function Categories() {
   const [showModal, setShowModal] = useState(false)
   const [dupliAnneeDebut, setDupliAnneeDebut] = useState('')
   const [dupliAnneeFin, setDupliAnneeFin] = useState('')
+  const [dupliCat, setDupliCat] = useState('')
   const [duplicating, setDuplicating] = useState(false)
 
   const toast = useToast()
@@ -77,12 +78,13 @@ export default function Categories() {
       // Trouver ou créer la saison cible
       let { data: saisonEx } = await supabase.from('saisons').select('id')
         .eq('equipe_id', equipeId).eq('annee_debut', parseInt(dupliAnneeDebut))
-        .eq('annee_fin', parseInt(dupliAnneeFin)).eq('categorie', selectedCat).maybeSingle()
+        .eq('annee_fin', parseInt(dupliAnneeFin)).eq('categorie', dupliCat || selectedCat).maybeSingle()
 
       let saisonId = saisonEx?.id
+      const catCible = dupliCat || selectedCat
       if (!saisonId) {
         const { data: ns } = await supabase.from('saisons')
-          .insert({ equipe_id: equipeId, annee_debut: parseInt(dupliAnneeDebut), annee_fin: parseInt(dupliAnneeFin), categorie: selectedCat })
+          .insert({ equipe_id: equipeId, annee_debut: parseInt(dupliAnneeDebut), annee_fin: parseInt(dupliAnneeFin), categorie: catCible })
           .select('id').single()
         saisonId = ns?.id
       }
@@ -103,6 +105,7 @@ export default function Categories() {
     setSelectedPlayers(new Map())
     setDupliAnneeDebut('')
     setDupliAnneeFin('')
+    setDupliCat('')
     toast(`${nbOk} joueur${nbOk > 1 ? 's' : ''} dupliqué${nbOk > 1 ? 's' : ''} ✓`)
     loadCategorie(selectedCat)
   }
@@ -314,10 +317,32 @@ export default function Categories() {
                 Dupliquer {nbSelectionnes} joueur{nbSelectionnes > 1 ? 's' : ''}
               </div>
               <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                Catégorie conservée : <strong style={{ color: catColors[selectedCat] }}>{selectedCat}</strong><br />
                 Les numéros de maillot sont conservés.
               </div>
             </div>
+
+            {/* Catégorie cible */}
+            <div>
+              <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.1em',
+                color: 'var(--text-dim)', marginBottom: '8px' }}>Catégorie cible</div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {['U13', 'U15', 'U18', 'SENIORS'].map(cat => {
+                  const cc = { 'U13': '#3b82f6', 'U15': '#10b981', 'U18': '#f59e0b', 'SENIORS': '#e8ff3a' }
+                  const active = (dupliCat || selectedCat) === cat
+                  return (
+                    <button key={cat} onClick={() => setDupliCat(cat)}
+                      style={{ fontSize: '0.78rem', padding: '5px 14px', borderRadius: '8px', cursor: 'pointer',
+                        border: `1px solid ${active ? cc[cat] : 'var(--border)'}`,
+                        background: active ? cc[cat] + '22' : 'var(--bg)',
+                        color: active ? cc[cat] : 'var(--text-muted)',
+                        fontWeight: active ? 700 : 400, transition: 'all 0.12s' }}>
+                      {cat}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <div className="form-group">
                 <label className="form-label">Saison — début</label>

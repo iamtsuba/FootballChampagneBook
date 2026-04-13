@@ -76,8 +76,16 @@ create table competitions (
   niveau text,        -- national, international, régional...
   description text,
   logo_url text,
+  categorie text,
+  nb_equipes integer,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
+);
+
+create table competition_equipes (
+  competition_id uuid references competitions(id) on delete cascade,
+  equipe_id      uuid references equipes(id) on delete cascade,
+  primary key (competition_id, equipe_id)
 );
 
 -- =============================================
@@ -96,6 +104,8 @@ create table matchs (
   phase text,          -- finale, demi-finale, poule A...
   resume text,
   evenements jsonb default '[]',  -- [{minute, type, personnage_id, description}]
+  saison_annee_debut integer,
+  saison_annee_fin   integer,
   notes text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
