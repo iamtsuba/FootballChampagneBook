@@ -12,6 +12,37 @@ const PAYS_PAR_REGION = [
   { region: 'Asie / Océanie', pays: ['Japon', 'Corée du Sud', 'Iran', 'Arabie Saoudite', 'Australie', 'Chine'] },
 ]
 
+const ANNEES_PAR_DECENNIE = [
+  { decennie: '2010–2015', annees: [2015, 2014, 2013, 2012, 2011, 2010] },
+  { decennie: '2000–2009', annees: [2009, 2008, 2007, 2006, 2005, 2004, 2003, 2002, 2001, 2000] },
+  { decennie: '1990–1999', annees: [1999, 1998, 1997, 1996, 1995, 1994, 1993, 1992, 1991, 1990] },
+  { decennie: '1980–1989', annees: [1989, 1988, 1987, 1986, 1985, 1984, 1983, 1982, 1981, 1980] },
+]
+
+const NUMEROS_PAR_POSTE = {
+  'GARDIEN':      [1, 16],
+  'DEF CENTRAL':  [4, 5, 12],
+  'DEF DROIT':    [2],
+  'DEF GAUCHE':   [3],
+  'MIL DEF':      [6, 8],
+  'MIL OFF':      [10, 14],
+  'MIL DROIT':    [7],
+  'MIL GAUCHE':   [11],
+  'AILIER DROIT': [7, 17],
+  'AILIER GAUCHE':[11, 15],
+  'BUTEUR':       [9, 13],
+}
+
+function assignerNumero(poste, numerosUtilises) {
+  for (const n of (NUMEROS_PAR_POSTE[poste] || [])) {
+    if (!numerosUtilises.has(n)) { numerosUtilises.add(n); return n }
+  }
+  let n = 18
+  while (numerosUtilises.has(n)) n++
+  numerosUtilises.add(n)
+  return n
+}
+
 const POSTES = [
   'GARDIEN', 'DEF DROIT', 'DEF CENTRAL', 'DEF GAUCHE',
   'MIL DROIT', 'MIL DEF', 'MIL OFF', 'MIL GAUCHE',
@@ -46,6 +77,7 @@ export default function IATool() {
   const [selection, setSelection]     = useState({})
 
   const [paysSelectionnes, setPaysSelectionnes] = useState([])
+  const [anneesNaissanceSelectionnees, setAnneesNaissanceSelectionnees] = useState([])
 
   const [generating, setGenerating]   = useState(false)
   const [progress, setProgress]       = useState([])   // messages de progression
@@ -82,6 +114,12 @@ export default function IATool() {
   function togglePays(pays) {
     setPaysSelectionnes(prev =>
       prev.includes(pays) ? prev.filter(p => p !== pays) : [...prev, pays]
+    )
+  }
+
+  function toggleAnnee(annee) {
+    setAnneesNaissanceSelectionnees(prev =>
+      prev.includes(annee) ? prev.filter(a => a !== annee) : [...prev, annee]
     )
   }
 
@@ -134,6 +172,9 @@ Pour chaque joueur, génère des données RÉALISTES et VARIÉES (physiques diff
 ${paysSelectionnes.length > 0
   ? `Nationalités : utilise UNIQUEMENT des joueurs originaires de ces pays (répartis de façon variée) : ${paysSelectionnes.join(', ')}.`
   : 'Nationalités mélangées et variées (pas que des français).'}
+${anneesNaissanceSelectionnees.length > 0
+  ? `Années de naissance : chaque joueur doit être né en une de ces années (répartis de façon variée) : ${[...anneesNaissanceSelectionnees].sort().join(', ')}. Calcule l'âge en conséquence (année courante : 2026).`
+  : ''}
 Adapte les tailles à la catégorie : ${categorie === 'U13' ? '13 ans (~148-162cm)' : categorie === 'U15' ? '15 ans (~158-175cm)' : categorie === 'U18' ? '18 ans (~168-185cm)' : 'seniors (~170-195cm)'}.
 
 Réponds UNIQUEMENT avec un tableau JSON valide, sans aucun texte avant ou après, sans balises markdown.
@@ -227,6 +268,11 @@ Génère exactement ${totalAGenerer} objets dans le tableau.`
 
     if (!saisonId) { toast('Erreur création saison', 'error'); setSaving(false); return }
 
+    // Charger les numéros déjà utilisés dans cette saison
+    const { data: sjExistants } = await supabase.from('saison_joueurs')
+      .select('numero_maillot').eq('saison_id', saisonId)
+    const numerosUtilises = new Set(sjExistants?.map(sj => sj.numero_maillot).filter(n => n != null) || [])
+
     let nbOk = 0
     for (const j of generated) {
       // Insert personnage
@@ -246,9 +292,10 @@ Génère exactement ${totalAGenerer} objets dans le tableau.`
 
       if (ep || !perso) continue
 
-      // Lier à la saison
+      // Lier à la saison avec numéro de maillot
+      const numero = assignerNumero(j.poste, numerosUtilises)
       await supabase.from('saison_joueurs').insert({
-        saison_id: saisonId, personnage_id: perso.id
+        saison_id: saisonId, personnage_id: perso.id, numero_maillot: numero
       })
       nbOk++
     }
@@ -375,9 +422,53 @@ Génère exactement ${totalAGenerer} objets dans le tableau.`
             </div>
           </div>
 
+          {/* Années de naissance */}
+          <div className="detail-section">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div className="detail-section-title" style={{ marginBottom: 0 }}>3. Années de naissance <span style={{ color: 'var(--text-dim)', fontWeight: 400, fontSize: '0.72rem' }}>(optionnel)</span></div>
+              {anneesNaissanceSelectionnees.length > 0 && (
+                <button onClick={() => setAnneesNaissanceSelectionnees([])}
+                  style={{ fontSize: '0.7rem', color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                  Tout effacer
+                </button>
+              )}
+            </div>
+            {anneesNaissanceSelectionnees.length === 0
+              ? <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)', fontStyle: 'italic', marginBottom: '10px' }}>
+                  Aucun filtre — âges générés automatiquement.
+                </p>
+              : <div style={{ marginBottom: '10px', fontSize: '0.78rem', color: 'var(--accent)' }}>
+                  {anneesNaissanceSelectionnees.length} année{anneesNaissanceSelectionnees.length > 1 ? 's' : ''} sélectionnée{anneesNaissanceSelectionnees.length > 1 ? 's' : ''}
+                </div>
+            }
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {ANNEES_PAR_DECENNIE.map(({ decennie, annees }) => (
+                <div key={decennie}>
+                  <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.1em',
+                    color: 'var(--text-dim)', marginBottom: '5px' }}>{decennie}</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                    {annees.map(a => {
+                      const selected = anneesNaissanceSelectionnees.includes(a)
+                      return (
+                        <button key={a} onClick={() => toggleAnnee(a)}
+                          style={{ fontSize: '0.74rem', padding: '3px 10px', borderRadius: '12px', cursor: 'pointer',
+                            border: `1px solid ${selected ? 'var(--accent)' : 'var(--border)'}`,
+                            background: selected ? 'var(--accent)' : 'var(--bg)',
+                            color: selected ? '#0a0a0f' : 'var(--text-muted)',
+                            fontWeight: selected ? 700 : 400, transition: 'all 0.12s' }}>
+                          {a}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Sélection des postes */}
           <div className="detail-section">
-            <div className="detail-section-title">3. Postes à générer</div>
+            <div className="detail-section-title">4. Postes à générer</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {POSTE_GROUPS.map(group => (
                 <div key={group.label}>
