@@ -4,6 +4,14 @@ import { useToast } from '../hooks/useToast'
 
 const CATEGORIES = ['U13', 'U15', 'U18', 'SENIORS']
 
+const PAYS_PAR_REGION = [
+  { region: 'Europe', pays: ['France', 'Espagne', 'Portugal', 'Italie', 'Allemagne', 'Angleterre', 'Pays-Bas', 'Belgique', 'Suisse', 'Croatie', 'Serbie', 'Pologne', 'Danemark', 'Suède', 'Autriche', 'Turquie', 'Grèce', 'Ukraine'] },
+  { region: 'Afrique', pays: ['Sénégal', "Côte d'Ivoire", 'Maroc', 'Cameroun', 'Nigeria', 'Mali', 'Guinée', 'Ghana', 'Algérie', 'Tunisie', 'RD Congo', 'Gabon', 'Madagascar'] },
+  { region: 'Amér. du Sud', pays: ['Brésil', 'Argentine', 'Colombie', 'Uruguay', 'Chili', 'Équateur', 'Venezuela', 'Paraguay', 'Pérou'] },
+  { region: 'Amér. Nord/C.', pays: ['USA', 'Mexique', 'Canada', 'Costa Rica', 'Jamaïque'] },
+  { region: 'Asie / Océanie', pays: ['Japon', 'Corée du Sud', 'Iran', 'Arabie Saoudite', 'Australie', 'Chine'] },
+]
+
 const POSTES = [
   'GARDIEN', 'DEF DROIT', 'DEF CENTRAL', 'DEF GAUCHE',
   'MIL DROIT', 'MIL DEF', 'MIL OFF', 'MIL GAUCHE',
@@ -37,6 +45,8 @@ export default function IATool() {
   // Sélection des postes à générer : { poste: count }
   const [selection, setSelection]     = useState({})
 
+  const [paysSelectionnes, setPaysSelectionnes] = useState([])
+
   const [generating, setGenerating]   = useState(false)
   const [progress, setProgress]       = useState([])   // messages de progression
   const [generated, setGenerated]     = useState([])   // joueurs générés (preview)
@@ -68,6 +78,12 @@ export default function IATool() {
   }
 
   useEffect(() => { loadEffectif() }, [equipeId, categorie, anneeDebut, anneeFin])
+
+  function togglePays(pays) {
+    setPaysSelectionnes(prev =>
+      prev.includes(pays) ? prev.filter(p => p !== pays) : [...prev, pays]
+    )
+  }
 
   function setCount(poste, delta) {
     setSelection(prev => {
@@ -114,7 +130,10 @@ Génère exactement ${totalAGenerer} joueurs de football avec les postes suivant
 
 Contexte : équipe "${equipeNom}", catégorie "${categorie}", saison ${anneeDebut}-${anneeFin}.
 
-Pour chaque joueur, génère des données RÉALISTES et VARIÉES (nationalités mélangées, physiques différents, pas que des français).
+Pour chaque joueur, génère des données RÉALISTES et VARIÉES (physiques différents).
+${paysSelectionnes.length > 0
+  ? `Nationalités : utilise UNIQUEMENT des joueurs originaires de ces pays (répartis de façon variée) : ${paysSelectionnes.join(', ')}.`
+  : 'Nationalités mélangées et variées (pas que des français).'}
 Adapte les tailles à la catégorie : ${categorie === 'U13' ? '13 ans (~148-162cm)' : categorie === 'U15' ? '15 ans (~158-175cm)' : categorie === 'U18' ? '18 ans (~168-185cm)' : 'seniors (~170-195cm)'}.
 
 Réponds UNIQUEMENT avec un tableau JSON valide, sans aucun texte avant ou après, sans balises markdown.
@@ -312,9 +331,53 @@ Génère exactement ${totalAGenerer} objets dans le tableau.`
             )}
           </div>
 
+          {/* Sélection des pays */}
+          <div className="detail-section">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div className="detail-section-title" style={{ marginBottom: 0 }}>2. Nationalités <span style={{ color: 'var(--text-dim)', fontWeight: 400, fontSize: '0.72rem' }}>(optionnel)</span></div>
+              {paysSelectionnes.length > 0 && (
+                <button onClick={() => setPaysSelectionnes([])}
+                  style={{ fontSize: '0.7rem', color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                  Tout effacer
+                </button>
+              )}
+            </div>
+            {paysSelectionnes.length === 0
+              ? <p style={{ fontSize: '0.78rem', color: 'var(--text-dim)', fontStyle: 'italic', marginBottom: '10px' }}>
+                  Aucun filtre — nationalités variées générées automatiquement.
+                </p>
+              : <div style={{ marginBottom: '10px', fontSize: '0.78rem', color: 'var(--accent)' }}>
+                  {paysSelectionnes.length} pays sélectionné{paysSelectionnes.length > 1 ? 's' : ''}
+                </div>
+            }
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {PAYS_PAR_REGION.map(({ region, pays }) => (
+                <div key={region}>
+                  <div style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.1em',
+                    color: 'var(--text-dim)', marginBottom: '5px' }}>{region}</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                    {pays.map(p => {
+                      const selected = paysSelectionnes.includes(p)
+                      return (
+                        <button key={p} onClick={() => togglePays(p)}
+                          style={{ fontSize: '0.74rem', padding: '3px 10px', borderRadius: '12px', cursor: 'pointer',
+                            border: `1px solid ${selected ? 'var(--accent)' : 'var(--border)'}`,
+                            background: selected ? 'var(--accent)' : 'var(--bg)',
+                            color: selected ? '#0a0a0f' : 'var(--text-muted)',
+                            fontWeight: selected ? 700 : 400, transition: 'all 0.12s' }}>
+                          {p}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Sélection des postes */}
           <div className="detail-section">
-            <div className="detail-section-title">2. Postes à générer</div>
+            <div className="detail-section-title">3. Postes à générer</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {POSTE_GROUPS.map(group => (
                 <div key={group.label}>
