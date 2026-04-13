@@ -147,7 +147,7 @@ Génère exactement ${totalAGenerer} objets dans le tableau.`
 
       addProgress('Génération en cours...')
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
