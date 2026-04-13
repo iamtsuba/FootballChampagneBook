@@ -14,7 +14,7 @@ create table personnages (
   nom text not null,
   prenom text not null,
   surnom text,
-  age integer,
+  annee_naissance integer,
   nationalite text,
   poste text,
   caracteristiques_design text, -- description physique détaillée

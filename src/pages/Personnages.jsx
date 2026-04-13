@@ -27,7 +27,7 @@ const MORPHOLOGIES     = ['Costaud', 'Musclé', 'Athlétique', 'Fin', 'Mince', '
 const PEAUX            = ['Noir', 'Blanc', 'Métisse', 'Méditerranéen', 'Asiatique']
 
 const empty = {
-  nom: '', prenom: '', surnom: '', age: '', nationalite: '', poste: '',
+  nom: '', prenom: '', surnom: '', annee_naissance: '', nationalite: '', poste: '',
   taille_u15: '', taille_u18: '', taille_senior: '',
   couleur_cheveux: '', couleur_yeux: '', type_coiffure: '', style_coiffure: '',
   type_nez: '', lunettes: false, morphologie: '', peau: '',
@@ -75,7 +75,7 @@ export default function Personnages() {
     setSaving(true)
     const payload = {
       ...current,
-      age: current.age ? parseInt(current.age) : null,
+      annee_naissance: current.annee_naissance ? parseInt(current.annee_naissance) : null,
       taille_u15: current.taille_u15 ? parseInt(current.taille_u15) : null,
       taille_u18: current.taille_u18 ? parseInt(current.taille_u18) : null,
       taille_senior: current.taille_senior ? parseInt(current.taille_senior) : null,
@@ -215,7 +215,7 @@ export default function Personnages() {
                 </div>
                 <div className="card-meta" style={{ marginTop: '8px' }}>
                   {p.nationalite && <span>🌍 {p.nationalite}</span>}
-                  {p.age && <span>⊕ {p.age} ans</span>}
+                  {p.annee_naissance && <span>né en {p.annee_naissance}</span>}
                   {p.morphologie && <span>{p.morphologie}</span>}
                 </div>
                 <div className="card-actions" onClick={e => e.stopPropagation()}>
@@ -260,8 +260,8 @@ export default function Personnages() {
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label">Âge</label>
-              <input className="form-input" type="number" value={current.age} onChange={e => set('age', e.target.value)} />
+              <label className="form-label">Année de naissance</label>
+              <input className="form-input" type="number" placeholder="ex: 1991" value={current.annee_naissance || ''} onChange={e => set('annee_naissance', e.target.value)} />
             </div>
             <div className="form-group">
               <label className="form-label">Nationalité</label>
@@ -356,7 +356,7 @@ export default function Personnages() {
                 </span>
               )}
               {current.nationalite && <span className="badge">🌍 {current.nationalite}</span>}
-              {current.age && <span className="badge">{current.age} ans</span>}
+              {current.annee_naissance && <span className="badge">né en {current.annee_naissance}</span>}
               {current.surnom && <span style={{ color: 'var(--accent)', fontSize: '0.9rem' }}>"{current.surnom}"</span>}
             </div>
 

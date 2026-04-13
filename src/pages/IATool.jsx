@@ -173,7 +173,7 @@ ${paysSelectionnes.length > 0
   ? `Nationalités : utilise UNIQUEMENT des joueurs originaires de ces pays (répartis de façon variée) : ${paysSelectionnes.join(', ')}.`
   : 'Nationalités mélangées et variées (pas que des français).'}
 ${anneesNaissanceSelectionnees.length > 0
-  ? `Années de naissance : chaque joueur doit être né en une de ces années (répartis de façon variée) : ${[...anneesNaissanceSelectionnees].sort().join(', ')}. Calcule l'âge en conséquence (année courante : 2026).`
+  ? `Années de naissance : chaque joueur doit avoir annee_naissance parmi ces valeurs (répartis de façon variée) : ${[...anneesNaissanceSelectionnees].sort().join(', ')}.`
   : ''}
 Adapte les tailles à la catégorie : ${categorie === 'U13' ? '13 ans (~148-162cm)' : categorie === 'U15' ? '15 ans (~158-175cm)' : categorie === 'U18' ? '18 ans (~168-185cm)' : 'seniors (~170-195cm)'}.
 
@@ -185,7 +185,7 @@ Format exact pour chaque joueur :
   "surnom": "string ou null",
   "poste": "exactement l'un de : GARDIEN, DEF DROIT, DEF CENTRAL, DEF GAUCHE, MIL DROIT, MIL DEF, MIL OFF, MIL GAUCHE, AILIER DROIT, AILIER GAUCHE, BUTEUR",
   "nationalite": "string",
-  "age": number,
+  "annee_naissance": number (année de naissance, ex: 1991),
   "peau": "exactement l'un de : Noir, Blanc, Métisse, Méditerranéen, Asiatique",
   "morphologie": "exactement l'un de : Costaud, Musclé, Athlétique, Fin, Mince, Enrobé, Grand et fin, Petit et trapu",
   "couleur_cheveux": "exactement l'un de : Chauve, Noir, Marron, Blond, Roux, Gris, Blanc, Coloré",
@@ -278,7 +278,7 @@ Génère exactement ${totalAGenerer} objets dans le tableau.`
       // Insert personnage
       const { data: perso, error: ep } = await supabase.from('personnages').insert({
         prenom: j.prenom, nom: j.nom, surnom: j.surnom || null,
-        poste: j.poste, nationalite: j.nationalite, age: j.age,
+        poste: j.poste, nationalite: j.nationalite, annee_naissance: j.annee_naissance || null,
         peau: j.peau, morphologie: j.morphologie,
         couleur_cheveux: j.couleur_cheveux, type_coiffure: j.type_coiffure,
         style_coiffure: j.style_coiffure || null, couleur_yeux: j.couleur_yeux,
@@ -599,7 +599,7 @@ Génère exactement ${totalAGenerer} objets dans le tableau.`
                       </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
                         {j.nationalite && <Tag>{j.nationalite}</Tag>}
-                        {j.age && <Tag>{j.age} ans</Tag>}
+                        {j.annee_naissance && <Tag>né en {j.annee_naissance}</Tag>}
                         {j.peau && <Tag>{j.peau}</Tag>}
                         {j.morphologie && <Tag>{j.morphologie}</Tag>}
                         {j.couleur_cheveux && <Tag>Chev. {j.couleur_cheveux}</Tag>}

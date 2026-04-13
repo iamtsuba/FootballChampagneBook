@@ -34,7 +34,7 @@ export default function Categories() {
     setSelectedPlayers(new Map())
     const { data: rows } = await supabase
       .from('saisons')
-      .select('*, equipes(id, nom, couleur_principale, couleur_secondaire), saison_joueurs(*, personnages(id, prenom, nom, poste))')
+      .select('*, equipes(id, nom, couleur_principale, couleur_secondaire), saison_joueurs(*, personnages(id, prenom, nom, poste, annee_naissance))')
       .eq('categorie', cat)
       .order('annee_debut')
     setData(rows || [])
@@ -279,6 +279,11 @@ export default function Categories() {
                                         <span style={{ fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.03em',
                                           color: POSTE_COLORS[sj.personnages.poste] || 'var(--text-dim)' }}>
                                           {sj.personnages.poste}
+                                        </span>
+                                      )}
+                                      {sj.personnages?.annee_naissance && (
+                                        <span style={{ fontSize: '0.65rem', color: 'var(--text-dim)', marginLeft: '2px' }}>
+                                          {saison.annee_fin - sj.personnages.annee_naissance} ans
                                         </span>
                                       )}
                                     </div>
