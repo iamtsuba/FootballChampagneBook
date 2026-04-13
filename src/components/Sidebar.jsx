@@ -25,6 +25,12 @@ const nav = [
       { to: '/livres', label: 'Livres', icon: '▣' },
     ]
   },
+  {
+    section: 'Outils',
+    links: [
+      { to: '/ia-tool', label: 'IA Tool', icon: '⚡' },
+    ]
+  },
 ]
 
 export default function Sidebar() {
