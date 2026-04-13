@@ -8,7 +8,15 @@ const emptyEquipe = {
   couleur_principale: '#e8ff3a', couleur_secondaire: '#0a0a0f',
   description_maillot: '', logo_url: '', palmarès: [], notes: ''
 }
-const emptySaison = { annee_debut: '', annee_fin: '' }
+const emptySaison = { annee_debut: '', annee_fin: '', categorie: '' }
+
+const CATEGORIES = [
+  'Professionnelle', 'Semi-professionnelle', 'Amateur',
+  'U6', 'U7', 'U8', 'U9', 'U10', 'U11', 'U12', 'U13',
+  'U14', 'U15', 'U16', 'U17', 'U18', 'U19', 'U20', 'U21', 'U23',
+  'Élite', 'Division 1', 'Division 2', 'Division 3',
+  'Nationale', 'Régionale', 'Départementale', 'Autre'
+]
 
 export default function Equipes() {
   const [data, setData] = useState([])
@@ -90,7 +98,8 @@ export default function Equipes() {
     const { error } = await supabase.from('saisons').insert({
       equipe_id: selectedEquipe.id,
       annee_debut: parseInt(newSaison.annee_debut),
-      annee_fin: parseInt(newSaison.annee_fin)
+      annee_fin: parseInt(newSaison.annee_fin),
+      categorie: newSaison.categorie || null
     })
     if (error) { toast('Erreur', 'error'); return }
     toast('Saison ajoutée ✓')
@@ -364,6 +373,14 @@ export default function Equipes() {
                         value={newSaison.annee_fin}
                         onChange={e => setNewSaison(s => ({ ...s, annee_fin: e.target.value }))} />
                     </div>
+                    <div className="form-group" style={{ flex: 2, minWidth: '160px' }}>
+                      <label className="form-label">Catégorie</label>
+                      <select className="form-select" value={newSaison.categorie}
+                        onChange={e => setNewSaison(s => ({ ...s, categorie: e.target.value }))}>
+                        <option value="">— Sélectionner —</option>
+                        {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
                     <button className="btn btn-primary" style={{ marginBottom: '1px' }} onClick={submitSaison}>
                       Créer la saison
                     </button>
@@ -393,6 +410,9 @@ export default function Equipes() {
                           {s.saison_joueurs?.length || 0} joueur{(s.saison_joueurs?.length || 0) !== 1 ? 's' : ''}
                         </span>
                       </span>
+                      {s.categorie && (
+                        <span className="badge badge-accent" style={{ marginLeft: '8px' }}>{s.categorie}</span>
+                      )}
                       <div style={{ display: 'flex', gap: '6px' }}>
                         <button className="btn btn-secondary btn-sm" onClick={() => toggleJoueurForm(s.id)}>
                           {form.open ? '✕ Annuler' : '+ Joueur'}
