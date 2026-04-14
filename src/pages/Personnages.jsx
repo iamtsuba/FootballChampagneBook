@@ -77,18 +77,12 @@ export default function Personnages() {
     setGeneratingPhoto(true)
     try {
       const prompt = buildPhotoPrompt(current)
-      const resp = await fetch('/api/generate-image', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt })
-      })
-      const result = await resp.json()
-      if (result.error) { toast('Erreur IA : ' + result.error, 'error'); return }
+      const encoded = encodeURIComponent(prompt)
+      const url = `https://image.pollinations.ai/prompt/${encoded}?width=512&height=512&nologo=true&seed=${Date.now()}`
 
-      // Base64 → Blob → Supabase Storage
-      const byteChars = atob(result.b64)
-      const byteArr = new Uint8Array(byteChars.length)
-      for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i)
-      const blob = new Blob([byteArr], { type: 'image/jpeg' })
+      const resp = await fetch(url)
+      if (!resp.ok) { toast(`Erreur IA : ${resp.status}`, 'error'); return }
+      const blob = await resp.blob()
 
       await supabase.storage.createBucket('avatars', { public: true }).catch(() => {})
       const fileName = `${current.id}_${Date.now()}.jpg`
