@@ -16,6 +16,7 @@ const nav = [
       { to: '/categories', label: 'Catégories', icon: '🏷' },
       { to: '/competitions', label: 'Compétitions', icon: '◆' },
       { to: '/matchs', label: 'Matchs', icon: '▶' },
+      { to: '/classement', label: 'Classements', icon: '🏆' },
     ]
   },
   {

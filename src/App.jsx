@@ -10,6 +10,7 @@ import Matchs from './pages/Matchs'
 import Arcs from './pages/Arcs'
 import Livres from './pages/Livres'
 import IATool from './pages/IATool'
+import Classement from './pages/Classement'
 import { ToastProvider } from './hooks/useToast'
 import './styles/global.css'
 
@@ -31,6 +32,7 @@ export default function App() {
               <Route path="/arcs" element={<Arcs />} />
               <Route path="/livres" element={<Livres />} />
               <Route path="/ia-tool" element={<IATool />} />
+              <Route path="/classement" element={<Classement />} />
             </Routes>
           </main>
         </div>

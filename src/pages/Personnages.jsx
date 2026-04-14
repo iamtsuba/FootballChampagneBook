@@ -48,7 +48,66 @@ export default function Personnages() {
   const [ajoutForm, setAjoutForm] = useState(emptyAjout)
   const [showAjoutForm, setShowAjoutForm] = useState(false)
   const [ajoutSaving, setAjoutSaving] = useState(false)
+  const [generatingPhoto, setGeneratingPhoto] = useState(false)
   const toast = useToast()
+
+  function buildPhotoPrompt(p) {
+    const peauMap = { 'Noir': 'dark skin', 'Blanc': 'fair skin', 'Métisse': 'mixed skin tone', 'Méditerranéen': 'olive mediterranean skin', 'Asiatique': 'east asian features' }
+    const morphoMap = { 'Costaud': 'stocky build', 'Musclé': 'muscular build', 'Athlétique': 'athletic build', 'Fin': 'slim build', 'Mince': 'slender build', 'Enrobé': 'chubby build', 'Grand et fin': 'tall and slim', 'Petit et trapu': 'short and stocky' }
+    const chevMap = { 'Chauve': 'bald', 'Noir': 'black hair', 'Marron': 'brown hair', 'Blond': 'blonde hair', 'Roux': 'red hair', 'Gris': 'grey hair', 'Blanc': 'white hair', 'Coloré': 'dyed hair' }
+    const coiffMap = { 'Chauve': '', 'Rasé': 'shaved head', 'Court': 'short haircut', 'Mi-long': 'medium length hair', 'Long': 'long hair' }
+    const parts = [
+      'Portrait of a football player, face and shoulders,',
+      peauMap[p.peau] || '',
+      morphoMap[p.morphologie] || '',
+      chevMap[p.couleur_cheveux] || '',
+      coiffMap[p.type_coiffure] || '',
+      p.style_coiffure || '',
+      p.couleur_yeux ? `${p.couleur_yeux.toLowerCase()} eyes` : '',
+      p.lunettes ? 'wearing glasses' : '',
+      p.type_nez ? `${p.type_nez.toLowerCase()} nose` : '',
+      p.caracteristiques_design || '',
+      'wearing football jersey, realistic digital art, high quality, detailed face, dramatic lighting'
+    ].filter(Boolean).join(', ')
+    return parts
+  }
+
+  async function genererPhoto() {
+    if (!current.id) { toast('Sauvegarde le personnage avant de générer une photo', 'error'); return }
+    setGeneratingPhoto(true)
+    try {
+      const prompt = buildPhotoPrompt(current)
+      const resp = await fetch('/api/generate-image', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
+      })
+      const result = await resp.json()
+      if (result.error) { toast('Erreur IA : ' + result.error, 'error'); return }
+
+      // Base64 → Blob → Supabase Storage
+      const byteChars = atob(result.b64)
+      const byteArr = new Uint8Array(byteChars.length)
+      for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i)
+      const blob = new Blob([byteArr], { type: 'image/jpeg' })
+
+      await supabase.storage.createBucket('avatars', { public: true }).catch(() => {})
+      const fileName = `${current.id}_${Date.now()}.jpg`
+      const { error: upErr } = await supabase.storage.from('avatars').upload(fileName, blob, { contentType: 'image/jpeg', upsert: true })
+      if (upErr) { toast('Erreur upload : ' + upErr.message, 'error'); return }
+
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName)
+      const url = urlData.publicUrl
+
+      await supabase.from('personnages').update({ avatar_url: url }).eq('id', current.id)
+      setCurrent(c => ({ ...c, avatar_url: url }))
+      setData(prev => prev.map(p => p.id === current.id ? { ...p, avatar_url: url } : p))
+      toast('Photo générée ✓')
+    } catch (err) {
+      toast('Erreur : ' + err.message, 'error')
+    } finally {
+      setGeneratingPhoto(false)
+    }
+  }
 
   async function load() {
     setLoading(true)
@@ -202,16 +261,24 @@ export default function Personnages() {
           <div className="cards-grid">
             {filtered.map(p => (
               <div key={p.id} className="card" onClick={() => openFiche(p)}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="card-title">{p.prenom} {p.nom}</div>
                     {p.surnom && <div style={{ color: 'var(--accent)', fontSize: '0.8rem' }}>"{p.surnom}"</div>}
                   </div>
-                  {p.poste && (
-                    <span className="badge" style={{ color: pc(p.poste), borderColor: pc(p.poste)+'44', background: pc(p.poste)+'11' }}>
-                      {p.poste}
-                    </span>
-                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px', flexShrink: 0 }}>
+                    {p.avatar_url && (
+                      <div style={{ width: '52px', height: '52px', borderRadius: '8px', overflow: 'hidden',
+                        border: `2px solid ${pc(p.poste)}44`, flexShrink: 0 }}>
+                        <img src={p.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </div>
+                    )}
+                    {p.poste && (
+                      <span className="badge" style={{ color: pc(p.poste), borderColor: pc(p.poste)+'44', background: pc(p.poste)+'11' }}>
+                        {p.poste}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="card-meta" style={{ marginTop: '8px' }}>
                   {p.nationalite && <span>🌍 {p.nationalite}</span>}
@@ -347,8 +414,35 @@ export default function Personnages() {
           </>}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-            {/* Badges identité */}
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* Photo IA */}
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+              <div style={{ flexShrink: 0 }}>
+                {current.avatar_url ? (
+                  <div style={{ width: '120px', height: '120px', borderRadius: '10px', overflow: 'hidden',
+                    border: `2px solid ${pc(current.poste)}44` }}>
+                    <img src={current.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
+                ) : (
+                  <div style={{ width: '120px', height: '120px', borderRadius: '10px',
+                    background: 'var(--bg)', border: '1px dashed var(--border)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'var(--text-dim)', fontSize: '2rem' }}>
+                    👤
+                  </div>
+                )}
+                <button onClick={genererPhoto} disabled={generatingPhoto}
+                  style={{ marginTop: '8px', width: '120px', fontSize: '0.72rem', padding: '6px',
+                    borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg)',
+                    color: generatingPhoto ? 'var(--text-dim)' : 'var(--accent)', cursor: generatingPhoto ? 'default' : 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', transition: 'all 0.15s' }}>
+                  {generatingPhoto
+                    ? <><span style={{ display: 'inline-block', width: 10, height: 10, border: '2px solid var(--accent)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} /> Génération...</>
+                    : '🎨 Générer photo IA'}
+                </button>
+              </div>
+
+              {/* Badges identité */}
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'flex-start', flex: 1 }}>
               {current.poste && (
                 <span className="badge" style={{ fontSize: '0.85rem', padding: '4px 14px',
                   color: pc(current.poste), borderColor: pc(current.poste)+'55', background: pc(current.poste)+'15' }}>
@@ -359,6 +453,7 @@ export default function Personnages() {
               {current.annee_naissance && <span className="badge">né en {current.annee_naissance}</span>}
               {current.surnom && <span style={{ color: 'var(--accent)', fontSize: '0.9rem' }}>"{current.surnom}"</span>}
             </div>
+          </div>
 
             {/* Tailles */}
             {(current.taille_u15 || current.taille_u18 || current.taille_senior) && (
