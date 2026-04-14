@@ -30,6 +30,7 @@ const nav = [
     section: 'Outils',
     links: [
       { to: '/ia-tool', label: 'IA Tool', icon: '⚡' },
+      { to: '/player-tool', label: 'Player Tool', icon: '👥' },
     ]
   },
 ]
