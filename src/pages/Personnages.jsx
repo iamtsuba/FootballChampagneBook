@@ -78,9 +78,9 @@ export default function Personnages() {
     try {
       const prompt = buildPhotoPrompt(current)
       const encoded = encodeURIComponent(prompt)
-      const url = `https://image.pollinations.ai/prompt/${encoded}?width=512&height=512&nologo=true&seed=${Date.now()}`
+      const pollinationsUrl = `https://image.pollinations.ai/prompt/${encoded}?width=512&height=512&nologo=true&seed=${Date.now()}`
 
-      const resp = await fetch(url)
+      const resp = await fetch(pollinationsUrl)
       if (!resp.ok) { toast(`Erreur IA : ${resp.status}`, 'error'); return }
       const blob = await resp.blob()
 
