@@ -16,6 +16,7 @@ export default function Categories() {
   const [selectedCat, setSelectedCat] = useState('SENIORS')
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
+  const [allEquipes, setAllEquipes] = useState([])
 
   // Sélection pour duplication : Map<sj_id, {personnageId, equipeId, numeroMaillot}>
   const [selectedPlayers, setSelectedPlayers] = useState(new Map())
@@ -25,6 +26,7 @@ export default function Categories() {
   const [dupliAnneeDebut, setDupliAnneeDebut] = useState('')
   const [dupliAnneeFin, setDupliAnneeFin] = useState('')
   const [dupliCat, setDupliCat] = useState('')
+  const [dupliEquipeId, setDupliEquipeId] = useState('')
   const [duplicating, setDuplicating] = useState(false)
 
   const toast = useToast()
@@ -42,7 +44,10 @@ export default function Categories() {
     setLoading(false)
   }
 
-  useEffect(() => { loadCategorie('SENIORS') }, [])
+  useEffect(() => {
+    loadCategorie('SENIORS')
+    supabase.from('equipes').select('id, nom').order('nom').then(({ data }) => setAllEquipes(data || []))
+  }, [])
 
   function togglePlayer(sj, equipeId) {
     setSelectedPlayers(prev => {
@@ -65,47 +70,62 @@ export default function Categories() {
       toast('Saisis une saison cible', 'error'); return
     }
     setDuplicating(true)
-
-    // Grouper par equipe
-    const byEquipe = new Map()
-    for (const [, info] of selectedPlayers) {
-      if (!byEquipe.has(info.equipeId)) byEquipe.set(info.equipeId, [])
-      byEquipe.get(info.equipeId).push(info)
-    }
+    const catCible = dupliCat || selectedCat
 
     let nbOk = 0
-    for (const [equipeId, players] of byEquipe) {
-      // Trouver ou créer la saison cible
-      let { data: saisonEx } = await supabase.from('saisons').select('id')
-        .eq('equipe_id', equipeId).eq('annee_debut', parseInt(dupliAnneeDebut))
-        .eq('annee_fin', parseInt(dupliAnneeFin)).eq('categorie', dupliCat || selectedCat).maybeSingle()
 
+    if (dupliEquipeId) {
+      // ─── Mode : club cible unique ───
+      let { data: saisonEx } = await supabase.from('saisons').select('id')
+        .eq('equipe_id', dupliEquipeId).eq('annee_debut', parseInt(dupliAnneeDebut))
+        .eq('annee_fin', parseInt(dupliAnneeFin)).eq('categorie', catCible).maybeSingle()
       let saisonId = saisonEx?.id
-      const catCible = dupliCat || selectedCat
       if (!saisonId) {
         const { data: ns } = await supabase.from('saisons')
-          .insert({ equipe_id: equipeId, annee_debut: parseInt(dupliAnneeDebut), annee_fin: parseInt(dupliAnneeFin), categorie: catCible })
+          .insert({ equipe_id: dupliEquipeId, annee_debut: parseInt(dupliAnneeDebut), annee_fin: parseInt(dupliAnneeFin), categorie: catCible })
           .select('id').single()
         saisonId = ns?.id
       }
-      if (!saisonId) continue
-
-      for (const p of players) {
-        const { error } = await supabase.from('saison_joueurs').insert({
-          saison_id: saisonId,
-          personnage_id: p.personnageId,
-          numero_maillot: p.numeroMaillot
-        })
-        if (!error) nbOk++
+      if (saisonId) {
+        for (const [, info] of selectedPlayers) {
+          const { error } = await supabase.from('saison_joueurs').insert({
+            saison_id: saisonId, personnage_id: info.personnageId, numero_maillot: info.numeroMaillot
+          })
+          if (!error) nbOk++
+        }
+      }
+    } else {
+      // ─── Mode : même club que l'original ───
+      const byEquipe = new Map()
+      for (const [, info] of selectedPlayers) {
+        if (!byEquipe.has(info.equipeId)) byEquipe.set(info.equipeId, [])
+        byEquipe.get(info.equipeId).push(info)
+      }
+      for (const [equipeId, players] of byEquipe) {
+        let { data: saisonEx } = await supabase.from('saisons').select('id')
+          .eq('equipe_id', equipeId).eq('annee_debut', parseInt(dupliAnneeDebut))
+          .eq('annee_fin', parseInt(dupliAnneeFin)).eq('categorie', catCible).maybeSingle()
+        let saisonId = saisonEx?.id
+        if (!saisonId) {
+          const { data: ns } = await supabase.from('saisons')
+            .insert({ equipe_id: equipeId, annee_debut: parseInt(dupliAnneeDebut), annee_fin: parseInt(dupliAnneeFin), categorie: catCible })
+            .select('id').single()
+          saisonId = ns?.id
+        }
+        if (!saisonId) continue
+        for (const p of players) {
+          const { error } = await supabase.from('saison_joueurs').insert({
+            saison_id: saisonId, personnage_id: p.personnageId, numero_maillot: p.numeroMaillot
+          })
+          if (!error) nbOk++
+        }
       }
     }
 
     setDuplicating(false)
     setShowModal(false)
     setSelectedPlayers(new Map())
-    setDupliAnneeDebut('')
-    setDupliAnneeFin('')
-    setDupliCat('')
+    setDupliAnneeDebut(''); setDupliAnneeFin(''); setDupliCat(''); setDupliEquipeId('')
     toast(`${nbOk} joueur${nbOk > 1 ? 's' : ''} dupliqué${nbOk > 1 ? 's' : ''} ✓`)
     loadCategorie(selectedCat)
   }
@@ -319,6 +339,15 @@ export default function Categories() {
               <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                 Les numéros de maillot sont conservés.
               </div>
+            </div>
+
+            {/* Club cible */}
+            <div>
+              <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-dim)', marginBottom: '8px' }}>Club cible <span style={{ color: 'var(--text-dim)', textTransform: 'none', letterSpacing: 0, fontStyle: 'italic' }}>(optionnel — si vide, conserve le club d'origine)</span></div>
+              <select className="form-select" value={dupliEquipeId} onChange={e => setDupliEquipeId(e.target.value)}>
+                <option value="">— Même club qu'à l'origine —</option>
+                {allEquipes.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
+              </select>
             </div>
 
             {/* Catégorie cible */}

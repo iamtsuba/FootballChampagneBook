@@ -41,6 +41,8 @@ export default function Personnages() {
   const [loading, setLoading]     = useState(true)
   const [search, setSearch]       = useState('')
   const [filterPoste, setFilterPoste] = useState('')
+  const [filterEquipe, setFilterEquipe] = useState('')
+  const [lastEquipeMap, setLastEquipeMap] = useState({})
   const [modal, setModal]         = useState(null)
   const [current, setCurrent]     = useState(empty)
   const [saving, setSaving]       = useState(false)
@@ -113,6 +115,24 @@ export default function Personnages() {
     const { data: rows } = await supabase.from('equipes').select('id, nom').order('nom')
     setEquipes(rows || [])
   }
+  async function loadLastEquipes() {
+    // Pour chaque personnage, on trouve la saison avec la plus grande annee_fin → l'équipe de ce dernier club
+    const { data: sjs } = await supabase
+      .from('saison_joueurs')
+      .select('personnage_id, saisons!inner(annee_fin, equipes!inner(id, nom))')
+    if (!sjs) return
+    const map = {}
+    for (const sj of sjs) {
+      const anneeFin = sj.saisons?.annee_fin
+      const equipe = sj.saisons?.equipes
+      if (!equipe || anneeFin == null) continue
+      const prev = map[sj.personnage_id]
+      if (!prev || anneeFin > prev.annee_fin) {
+        map[sj.personnage_id] = { equipe_id: equipe.id, equipe_nom: equipe.nom, annee_fin: anneeFin }
+      }
+    }
+    setLastEquipeMap(map)
+  }
   async function loadClubHistory(id) {
     const { data: rows } = await supabase
       .from('saison_joueurs')
@@ -120,7 +140,7 @@ export default function Personnages() {
       .eq('personnage_id', id)
     setClubHistory(rows || [])
   }
-  useEffect(() => { load(); loadEquipes() }, [])
+  useEffect(() => { load(); loadEquipes(); loadLastEquipes() }, [])
 
   function set(field, val) { setCurrent(c => ({ ...c, [field]: val })) }
 
@@ -195,7 +215,10 @@ export default function Personnages() {
 
   const filtered = data.filter(p => {
     const s = `${p.nom} ${p.prenom} ${p.surnom || ''}`.toLowerCase()
-    return s.includes(search.toLowerCase()) && (!filterPoste || p.poste === filterPoste)
+    const matchSearch = s.includes(search.toLowerCase())
+    const matchPoste = !filterPoste || p.poste === filterPoste
+    const matchEquipe = !filterEquipe || lastEquipeMap[p.id]?.equipe_id === filterEquipe
+    return matchSearch && matchPoste && matchEquipe
   })
 
   const pc = (poste) => POSTE_COLORS[poste] || 'var(--text-muted)'
@@ -243,8 +266,13 @@ export default function Personnages() {
           <option value="">Tous les postes</option>
           {POSTES.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
-        {filterPoste && (
-          <button className="btn btn-secondary btn-sm" onClick={() => setFilterPoste('')}>✕ Effacer</button>
+        <select className="form-select" style={{ minWidth: '200px' }}
+          value={filterEquipe} onChange={e => setFilterEquipe(e.target.value)}>
+          <option value="">Tous les clubs</option>
+          {equipes.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
+        </select>
+        {(filterPoste || filterEquipe) && (
+          <button className="btn btn-secondary btn-sm" onClick={() => { setFilterPoste(''); setFilterEquipe('') }}>✕ Effacer</button>
         )}
       </div>
 

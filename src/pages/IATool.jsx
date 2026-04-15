@@ -268,13 +268,26 @@ Génère exactement ${totalAGenerer} objets dans le tableau.`
 
     if (!saisonId) { toast('Erreur création saison', 'error'); setSaving(false); return }
 
+    // Vérifier les doublons de noms avec les personnages existants
+    const { data: existingNames } = await supabase.from('personnages').select('prenom, nom')
+    const existingSet = new Set((existingNames || []).map(p => `${p.prenom}|${p.nom}`.toLowerCase()))
+    const batchNames = new Set()
+    const uniqueGenerated = generated.filter(j => {
+      const key = `${j.prenom}|${j.nom}`.toLowerCase()
+      if (existingSet.has(key) || batchNames.has(key)) return false
+      batchNames.add(key); return true
+    })
+    const nDoublons = generated.length - uniqueGenerated.length
+    if (nDoublons > 0) toast(`${nDoublons} joueur${nDoublons > 1 ? 's' : ''} ignoré${nDoublons > 1 ? 's' : ''} (nom déjà existant)`, 'error')
+    if (uniqueGenerated.length === 0) { setSaving(false); return }
+
     // Charger les numéros déjà utilisés dans cette saison
     const { data: sjExistants } = await supabase.from('saison_joueurs')
       .select('numero_maillot').eq('saison_id', saisonId)
     const numerosUtilises = new Set(sjExistants?.map(sj => sj.numero_maillot).filter(n => n != null) || [])
 
     let nbOk = 0
-    for (const j of generated) {
+    for (const j of uniqueGenerated) {
       // Insert personnage
       const { data: perso, error: ep } = await supabase.from('personnages').insert({
         prenom: j.prenom, nom: j.nom, surnom: j.surnom || null,
